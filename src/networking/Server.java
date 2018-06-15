@@ -138,6 +138,7 @@ public class Server extends NetworkCommunicator implements Runnable, Closeable {
             status = Status.ACCEPTING;
         }
         finally{
+            System.out.println("Closing connection");
             closeConnection();
         }
     }
@@ -179,6 +180,7 @@ public class Server extends NetworkCommunicator implements Runnable, Closeable {
         try{
             while(status == Status.ACCEPTING) {
                 sock = server_socket.accept();
+                System.out.println("Client Connected");
                 server_mainloop();
             }
         }
