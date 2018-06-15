@@ -7,7 +7,8 @@ import java.util.ArrayList;
 public class Client extends NetworkCommunicator implements Runnable, Closeable {
 
     private Socket sock;
-    private String directory;
+    private String directory; // name of the directory being sent over
+    private String destination; // destination directory
     private ArrayList<String> filelist;
 
     public Client(String hostname, int port_num){
@@ -20,7 +21,7 @@ public class Client extends NetworkCommunicator implements Runnable, Closeable {
         }
     }
 
-    public void retreiveFileList(){
+    public void retrieveFileList(){
         try(ObjectInputStream in = new ObjectInputStream(sock.getInputStream());
             ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream()))
         {
@@ -32,7 +33,7 @@ public class Client extends NetworkCommunicator implements Runnable, Closeable {
         }
     }
 
-    public void retreiveDirectoryName(){
+    public void retrieveDirectoryName(){
         try(ObjectInputStream in = new ObjectInputStream(sock.getInputStream());
             ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream()))
         {
@@ -48,9 +49,12 @@ public class Client extends NetworkCommunicator implements Runnable, Closeable {
         this.directory = directory;
     }
 
+    public void setDestination(String destination){
+        this.destination = destination;
+    }
+
     @Override
     public void run(){
-        File flie;
         try(DataInputStream socket_in = new DataInputStream(sock.getInputStream());
             ObjectInputStream object_in = new ObjectInputStream(sock.getInputStream());
             ObjectOutputStream object_out = new ObjectOutputStream(sock.getOutputStream()))
@@ -58,7 +62,8 @@ public class Client extends NetworkCommunicator implements Runnable, Closeable {
             File file;
             long file_size;
             for(String currentFile : filelist){
-                file = new File(directory + currentFile);
+                System.out.println("Retrieving file " + destination + directory + currentFile);
+                file = new File(destination + directory + currentFile);
                 sendRequest(object_out, Request.FILE);
                 file_size = recvFileSize(object_in);
                 receiveFile(socket_in, file, file_size);
