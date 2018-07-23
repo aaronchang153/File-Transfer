@@ -9,16 +9,13 @@ public class NetworkCommunicator {
      * communicate with each other
      *
      * Both Server and Client should extend this class so that
-     * they always use the exact same enum for requests.
-     *
-     * Send enum value as:
-     *      int ordinal = Request.FILE.ordinal();
-     *
-     * Retrieve enum value as:
-     *      Request.values[ordinal];
+     * they always use the exact same format for requests.
      */
 
-    public enum Request{END, DIRECTORY_NAME, FILE_LIST, FILE}
+    public static final byte END = 0;
+    public static final byte DIRECTORY_NAME = 1;
+    public static final byte FILE_LIST = 2;
+    public static final byte FILE = 3;
 
     private static final int BUFFER_SIZE = 4096;
 
@@ -26,9 +23,11 @@ public class NetworkCommunicator {
         try(FileInputStream file_in = new FileInputStream(src))
         {
             byte[] buffer = new byte[BUFFER_SIZE];
-            while(file_in.read(buffer) > 0){
-                out.write(buffer);
+            int read;
+            while((read = file_in.read(buffer)) > 0){
+                out.write(buffer, 0, read);
             }
+            out.flush();
         }
         catch(IOException e){
             e.printStackTrace();
@@ -37,11 +36,7 @@ public class NetworkCommunicator {
     }
 
     public void receiveFile(DataInputStream in, File dst, long size) throws IOException {
-        File parent = new File(dst.toString().substring(0, dst.toString().lastIndexOf("\\")));
-        if(!parent.exists()){
-            // If the parent directory/directories for the file do not exist, create them.
-            parent.mkdirs();
-        }
+        dst.getParentFile().mkdirs();
         dst.createNewFile();
         try(FileOutputStream file_out = new FileOutputStream(dst))
         {
@@ -64,18 +59,23 @@ public class NetworkCommunicator {
         }
     }
 
-    public void sendRequest(ObjectOutputStream out, Request request) throws IOException{
-        int ordinal = request.ordinal();
-        out.writeInt(ordinal);
+    public void sendRequest(ObjectOutputStream out, byte request) throws IOException{
+        out.writeByte(request);
+        out.flush();
     }
 
-    public Request recvRequest(ObjectInputStream in) throws IOException, ArrayIndexOutOfBoundsException{
-        int ordinal = in.readInt();
-        return Request.values()[ordinal];
+    public byte recvRequest(ObjectInputStream in) throws IOException, ArrayIndexOutOfBoundsException{
+        byte request = in.readByte();
+        if(request < END || request > FILE)
+            // Throw ArrayIndexOutOfBoundsException on invalid request to stay consistent
+            // with an old version of this method
+            throw new ArrayIndexOutOfBoundsException();
+        return request;
     }
 
     public void sendFileSize(ObjectOutputStream out, long data) throws IOException{
         out.writeLong(data);
+        out.flush();
     }
 
     public long recvFileSize(ObjectInputStream in) throws IOException{
@@ -84,6 +84,7 @@ public class NetworkCommunicator {
 
     public void sendString(ObjectOutputStream out, String data) throws IOException{
         out.writeObject(data);
+        out.flush();
     }
 
     public String recvString(ObjectInputStream in) throws IOException{
@@ -99,6 +100,7 @@ public class NetworkCommunicator {
 
     public void sendFileList(ObjectOutputStream out, ArrayList<String> data) throws  IOException{
         out.writeObject(data);
+        out.flush();
     }
 
     public ArrayList<String> recvFileList(ObjectInputStream in) throws IOException{
