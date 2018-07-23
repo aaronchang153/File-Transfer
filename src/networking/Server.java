@@ -18,6 +18,8 @@ public class Server extends NetworkCommunicator implements Runnable, Closeable {
 
     private ServerSocket server_socket;
     private Socket sock;
+    private ObjectOutputStream object_out;
+    private ObjectInputStream object_in;
     private String directory;
     private ArrayList<String> filelist;
 
@@ -91,13 +93,11 @@ public class Server extends NetworkCommunicator implements Runnable, Closeable {
     }
 
     private void server_mainloop(){
-        try(DataOutputStream socket_out = new DataOutputStream(sock.getOutputStream());
-            ObjectInputStream object_in = new ObjectInputStream(sock.getInputStream());
-            ObjectOutputStream object_out = new ObjectOutputStream(sock.getOutputStream()))
+        try(DataOutputStream socket_out = new DataOutputStream(sock.getOutputStream()))
         {
             String received;
             File file;
-            Request request;
+            byte request;
             long file_size;
             status = Status.CLIENT_CONNECTED;
             while (status == Status.CLIENT_CONNECTED) {
@@ -110,7 +110,8 @@ public class Server extends NetworkCommunicator implements Runnable, Closeable {
                         status = Status.ACCEPTING;
                         break;
                     case DIRECTORY_NAME:
-                        sendString(object_out, directory);
+                        //sendString(object_out, directory);
+                        sendString(object_out, directory.substring(directory.lastIndexOf("\\")));
                         break;
                     case FILE_LIST:
                         sendFileList(object_out, filelist);
@@ -118,11 +119,13 @@ public class Server extends NetworkCommunicator implements Runnable, Closeable {
                     case FILE:
                         received = recvString(object_in);
                         file = new File(directory + received);
-                        if(file.exists() && file.isFile()){
+                        if (file.exists() && file.isFile()) {
                             file_size = file.length();
                             sendFileSize(object_out, file_size);
                             sendFile(socket_out, file);
                         }
+                        break;
+                    default:
                         break;
                 }
             }
@@ -146,9 +149,9 @@ public class Server extends NetworkCommunicator implements Runnable, Closeable {
     private void closeConnection(){
         // Like close(), but this only closes sock. Leaves server_socket alone.
         try {
-            if (sock != null) {
-                sock.close();
-            }
+            sock.close();
+            object_in.close();
+            object_out.close();
         }
         catch(IOException ignored) { }
         finally{
@@ -161,12 +164,10 @@ public class Server extends NetworkCommunicator implements Runnable, Closeable {
         // If the Server object is closed while inside its accept() loop, the Thread it's
         // running in will throw a SocketException. That exception should be handled.
         try{
-            if(sock != null){
-                sock.close();
-            }
-            if(server_socket != null){
-                server_socket.close();
-            }
+            sock.close();
+            object_in.close();
+            object_out.close();
+            server_socket.close();
         }
         catch(IOException ignored){ }
         finally{
@@ -181,6 +182,8 @@ public class Server extends NetworkCommunicator implements Runnable, Closeable {
             while(status == Status.ACCEPTING) {
                 sock = server_socket.accept();
                 System.out.println("Client Connected");
+                object_out = new ObjectOutputStream(sock.getOutputStream());
+                object_in = new ObjectInputStream(sock.getInputStream());
                 server_mainloop();
             }
         }

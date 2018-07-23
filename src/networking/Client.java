@@ -7,6 +7,8 @@ import java.util.ArrayList;
 public class Client extends NetworkCommunicator implements Runnable, Closeable {
 
     private Socket sock;
+    private ObjectOutputStream object_out;
+    private ObjectInputStream object_in;
     private String directory; // name of the directory being sent over
     private String destination; // destination directory
     private ArrayList<String> filelist;
@@ -14,6 +16,8 @@ public class Client extends NetworkCommunicator implements Runnable, Closeable {
     public Client(String hostname, int port_num){
         try {
             sock = new Socket(hostname, port_num);
+            object_out = new ObjectOutputStream(sock.getOutputStream());
+            object_in = new ObjectInputStream(sock.getInputStream());
         }
         catch(Exception e){
             e.printStackTrace();
@@ -22,11 +26,9 @@ public class Client extends NetworkCommunicator implements Runnable, Closeable {
     }
 
     public void retrieveFileList(){
-        try(ObjectInputStream in = new ObjectInputStream(sock.getInputStream());
-            ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream()))
-        {
-            sendRequest(out, Request.FILE_LIST);
-            filelist = recvFileList(in);
+        try{
+            sendRequest(object_out, NetworkCommunicator.FILE_LIST);
+            filelist = recvFileList(object_in);
         }
         catch(IOException e){
             e.printStackTrace();
@@ -34,11 +36,9 @@ public class Client extends NetworkCommunicator implements Runnable, Closeable {
     }
 
     public void retrieveDirectoryName(){
-        try(ObjectInputStream in = new ObjectInputStream(sock.getInputStream());
-            ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream()))
-        {
-            sendRequest(out, Request.DIRECTORY_NAME);
-            directory = recvString(in);
+        try{
+            sendRequest(object_out, NetworkCommunicator.DIRECTORY_NAME);
+            directory = recvString(object_in);
         }
         catch(IOException e){
             e.printStackTrace();
@@ -55,20 +55,18 @@ public class Client extends NetworkCommunicator implements Runnable, Closeable {
 
     @Override
     public void run(){
-        try(DataInputStream socket_in = new DataInputStream(sock.getInputStream());
-            ObjectInputStream object_in = new ObjectInputStream(sock.getInputStream());
-            ObjectOutputStream object_out = new ObjectOutputStream(sock.getOutputStream()))
-        {
+        try(DataInputStream socket_in = new DataInputStream(sock.getInputStream())){
             File file;
             long file_size;
             for(String currentFile : filelist){
                 System.out.println("Retrieving file " + destination + directory + currentFile);
                 file = new File(destination + directory + currentFile);
-                sendRequest(object_out, Request.FILE);
+                sendRequest(object_out, NetworkCommunicator.FILE);
+                sendString(object_out, currentFile);
                 file_size = recvFileSize(object_in);
                 receiveFile(socket_in, file, file_size);
             }
-            sendRequest(object_out, Request.END);
+            sendRequest(object_out, NetworkCommunicator.END);
         }
         catch(IOException e){
             e.printStackTrace();
@@ -79,6 +77,8 @@ public class Client extends NetworkCommunicator implements Runnable, Closeable {
     public void close(){
         try {
             sock.close();
+            object_in.close();
+            object_out.close();
         }
         catch(IOException ignored) {}
     }
